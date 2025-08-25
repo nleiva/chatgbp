@@ -5,7 +5,7 @@ A simple chatGPT clone built for educational purposes, supporting CLI, web, and 
 
 ## Prerequisites
 
-- Go 1.21 or later
+- Go 1.24 or later
 - OpenAI API key
 
 ## Installation

@@ -1,13 +1,11 @@
-# LLM Test
+# Curl examples
 
-## Curl examples
-
-### Models list
+## Models list
 
 ```bash
 curl https://api.openai.com/v1/models \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
-  -H "OpenAI-Organization: org-3t9bdS1915T24Y6IlQCDt3Y3" \
+  -H "OpenAI-Organization: "$ORG"" \
   -H "OpenAI-Project: $PROJECT_ID"
 ```
 
@@ -37,7 +35,7 @@ curl https://api.openai.com/v1/models \
 }
 ```
 
-### Chat
+## Chat
 
 ```bash
 curl https://api.openai.com/v1/responses \

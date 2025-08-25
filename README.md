@@ -12,19 +12,12 @@ A simple ChatGPT clone built for educational purposes, supporting CLI, web, and 
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd chatGBT
+git clone https://github.com/nleiva/chatgbp.git
+cd chatgbt
 ```
 
-2. Install dependencies:
+2. Build the application:
 ```bash
-go mod tidy
-```
-
-3. Build the application:
-```bash
-go build -o chatgbt .
-# Or using Make
 make build
 ```
 
@@ -44,7 +37,7 @@ Interactive terminal interface:
 
 ```bash
 export OPENAI_API_KEY="your-api-key-here"
-./chatgbt cli
+make run-cli
 ```
 
 #### CLI Commands
@@ -63,7 +56,7 @@ Start the web server:
 
 ```bash
 export OPENAI_API_KEY="your-api-key-here"
-./chatgbt web
+make run-web
 ```
 
 The web interface will be available at `http://localhost:3000`
@@ -87,7 +80,3 @@ export OPENAI_API_KEY="your-api-key-here"
   - [Templ](https://github.com/a-h/templ) - Type-safe HTML templates
   - [HTMX](https://htmx.org/) - Dynamic web interactions
 - **API**: OpenAI Chat Completions API
-
-## License
-
-This project is for educational purposes. Please respect OpenAI's usage policies when using their API.

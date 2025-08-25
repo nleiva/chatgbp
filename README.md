@@ -1,5 +1,5 @@
 # ChatGBT - Educational ChatGPT Clone
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/nleiva/chatGBT?quickstart=1)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/nleiva/chatgbt?quickstart=1)
 
 A simple ChatGPT clone built for educational purposes, supporting CLI, web, and direct query modes.
 

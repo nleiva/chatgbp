@@ -2,13 +2,10 @@
 
 After spending some time with LLMs, a few things kept getting in the way: conversations would stall out, I couldn’t tell what each run was costing, and the whole thing felt like a black box. That’s when I built ChatGBT (my prototype, not OpenAI’s product). The goal wasn’t to clone ChatGPT, but to separate prompt wording issues from architectural ones. I wanted something lean, without abstractions or [SDKs](https://github.com/openai/openai-go), so I could see how LLM interactions actually work behind the scenes.
 
----
-
 ## But, why?
 
 Most of the time we use LLMs through polished UIs, where the defaults and prompt handling are already decided for us. Once you roll your own, you’re the one deciding how far the context goes, when to prune, how retries work, and what the UI says when it fails.
 
----
 
 ## Architecture (Go + Fiber + HTMX)
 
@@ -63,7 +60,7 @@ The OpenAI Chat [Completions API](https://platform.openai.com/docs/api-reference
 - System: Sets the behavior of the assistant
 - User: Your input
 - Assistant: The model’s reply 
-- Tool: Results from your app’s tools or functions, passed back in when function calling is enabled
+- Tool: Results from your app’s tools or functions
 
 To preserve context, you resend relevant messages each call, usually a mix of recent exchanges plus a running summary to stay inside the context window.
 
@@ -71,7 +68,6 @@ One detail worth knowing: the JSON you send doesn’t feed straight into the mod
 
 That’s why I kept both CLI and web modes sharing the same conversation logic. The interface changed, but the way messages were structured didn’t. And that’s the bigger lesson, prompt engineering isn’t about clever wording, it’s about how you manage the flow of the whole conversation.
 
----
 
 ### Two Modes
 
@@ -161,8 +157,6 @@ func (s *Server) handleChat(c *fiber.Ctx) error {
 
 The web mode automated pruning, budget warnings, and error recovery: things that were manual in the CLI. Together, the two modes taught me how design decisions shift with context.
 
----
-
 ## Lessons Learned
 
 ### Context Management
@@ -175,16 +169,17 @@ Faster iteration → better prompts. The faster you can test ideas, the better y
 Specific instructions outperformed “role-playing” prompts. Example:
 
 **Bad:** `Act like a senior engineer, fix this error.`
+
 **Good:** `Go handler throws 500 on empty form submit. What's the likely nil pointer and simple fix?`
 
 The same applied when I was working on the web interface. Asking for generic design help gave me fluff, but precise prompts about my stack delivered useful results:
 
 **Bad:**  `Make this look like ChatGPT.`
+
 **Good:** `Using HTMX and Templ, show me how to structure a dark-mode chat bubble layout with user messages right-aligned and assistant messages left-aligned. Minimal CSS, no JavaScript.`
 
 Bottom line? Skip the personality theater and be specific about what you need. The model doesn’t need to “act like” anything; it needs clear, actionable instructions that line up with your actual code and tools.
 
----
 
 ## Using AI to Build AI Stuff
 
@@ -234,8 +229,6 @@ The model didn't just solve my immediate problem; it showed me reusable techniqu
 
 IMPORTANT: stay in control of the code. If the model generates something you don’t fully understand, that’s a red flag. Stop and reassess. Writing new code is cheap; maintaining mysterious code in production is expensive. The last thing you want is a critical bug at 2 AM in a module no one on your team can explain.
 
----
-
 ## The Stuff I Messed Up
 
 **1. Token Budgets Are Critical**
@@ -254,13 +247,11 @@ If I were starting over, I’d probably build on top of the OpenAI Responses API
 
 **5. Future API Capabilities to Explore**
 There are features I didn’t touch the first time around but definitely want to try:
-* **`stream`:** Send tokens as they’re generated. It makes the app feel more responsive since users can start reading before the full response is ready.
+* **`stream`:** The model send tokens as they’re generated. It makes the app feel more responsive since users can start reading before the full response is ready.
 * **`temperature`:** Controls how deterministic the output is. At `0`, responses can be repetitive; higher values add variety, though very high values often get incoherent.
-* **`n`:** Generate multiple completions in parallel. Handy when testing prompts, since you can compare options side by side. It’s faster than rerunning requests manually, though you still pay for all the tokens.
+* **`n`:** Generate multiple completions in parallel (up to 128). Handy when testing prompts, since you can compare options side by side. It’s faster than rerunning requests manually, though you still pay for all the tokens.
 
 I skipped these at first to keep the scope small, but they’re worth exploring to improve both the user experience and the way prompts are tested.
-
----
 
 ## Costs
 
@@ -270,11 +261,9 @@ Let's talk money. I was curious about costs too, so I tracked everything.
 
 In real conversations:
 
-**Simple Q&A** (~1k tokens in, 500 out): Under a penny with gpt-4o-mini, maybe $0.0015 with Turbo.
-
-**Code debugging sessions** (5-7 back-and-forth exchanges): $0.01-$0.02 with gpt-4o-mini, $0.05-$0.10 with Turbo.
-
-**Long creative sessions**: Under $0.10 with gpt-4o-mini, $0.20-$0.40 with Turbo.
+- **Simple Q&A** (~1k tokens in, 500 out): Under a penny with gpt-4o-mini, maybe $0.0015 with Turbo.
+- **Code debugging sessions** (5-7 back-and-forth exchanges): $0.01-$0.02 with gpt-4o-mini, $0.05-$0.10 with Turbo.
+- **Long creative sessions**: Under $0.10 with gpt-4o-mini, $0.20-$0.40 with Turbo.
 
 With `gpt-4o-mini`, you’re usually spending well under $0.01, and design choices (like pruning or summarization) matter more than raw model cost. With Turbo, the bill adds up faster.
 
@@ -290,8 +279,6 @@ PORT=3000
 
 These defaults are safe for development and light daily use. If you scale to heavier workloads, tune `TOKEN_BUDGET` down (e.g. 50k) for tighter guardrails, or bump `COST_BUDGET` up if you want more breathing room.
 
----
-
 ## Ops Basics
 
 Building **ChatGBT** meant thinking through some operational basics:
@@ -303,9 +290,6 @@ Building **ChatGBT** meant thinking through some operational basics:
 - **Data:** Don’t store full transcripts unless you have to, and encrypt them if you do.
 - **Rate Limits:** Design for graceful degradation when limits hit
 
-
----
-
 ## If You're a Manager
 
 I put this together for under ~$20 and a couple of weekends. That was enough to give me the context to weigh in on $100K platform decisions.
@@ -314,9 +298,6 @@ Model literacy isn’t about memorizing model names or buzzwords. It’s knowing
 
 The real takeaway wasn’t ending up with a ChatGPT clone. It was all the things that went wrong along the way, and learning how to fix them. That’s where you start to really understand how these systems behave
 
-
----
-
 ## What **ChatGBT** Can Do Today
 
 The finished project isn't groundbreaking, but it's useful. 
@@ -324,11 +305,7 @@ The finished project isn't groundbreaking, but it's useful.
 - **CLI Mode**: Quick tests and code reviews.
 - **Web Mode**: Workshops and demos. It handles conversation context intelligently, fails gracefully when the API is down, and costs pennies to run. 
 
-
 More importantly, I understand every line of code and every design decision.
-
-
----
 
 Building this drove home that the value isn’t in having every answer, it’s in learning how to ask better questions. And the best way I’ve found to do that is by building something that help me ask them.
 

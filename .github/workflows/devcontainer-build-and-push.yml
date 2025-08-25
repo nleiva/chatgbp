@@ -29,6 +29,6 @@ jobs:
       - name: Build and run Dev Container task
         uses: devcontainers/ci@v0.3
         with:
-          imageName: ghcr.io/nleiva/chatGBT
-          cacheFrom: ghcr.io/nleiva/chatGBT
+          imageName: ghcr.io/nleiva/chatgbt
+          cacheFrom: ghcr.io/nleiva/chatgbt
           push: always

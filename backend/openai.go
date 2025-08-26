@@ -2,19 +2,15 @@ package backend
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 )
 
-var (
-	// Reuse HTTP client for better performance
-	httpClient = &http.Client{
-		Timeout: 30 * time.Second,
-	}
-)
+// Note: Removed global httpClient variable to avoid global mutable state.
+// Each client should have its own HTTP client instance for safety and configurability.
 
 // Role represents the different message roles in a conversation
 // As defined in the OpenAI Chat Completions API
@@ -93,7 +89,12 @@ func makeRequest(cfg LLMConfig, messages []Message) (*ChatResponse, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
 
-	resp, err := httpClient.Do(req)
+	// Create HTTP client with proper timeout for this request
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}

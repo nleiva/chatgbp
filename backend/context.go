@@ -91,19 +91,19 @@ func (cm *ContextManager) createSummary(messages []Message) string {
 		switch msg.Role {
 		case RoleUser:
 			userQuestions++
-			// Extract key topics (simple keyword detection)
+			// Extract key topics using switch for better performance
 			content := strings.ToLower(msg.Content)
-			if strings.Contains(content, "code") || strings.Contains(content, "debug") || strings.Contains(content, "error") {
+
+			switch {
+			case strings.Contains(content, "code") || strings.Contains(content, "debug") || strings.Contains(content, "error"):
 				if !contains(topics, "code/debugging") {
 					topics = append(topics, "code/debugging")
 				}
-			}
-			if strings.Contains(content, "explain") || strings.Contains(content, "how") || strings.Contains(content, "what") {
+			case strings.Contains(content, "explain") || strings.Contains(content, "how") || strings.Contains(content, "what"):
 				if !contains(topics, "explanations") {
 					topics = append(topics, "explanations")
 				}
-			}
-			if strings.Contains(content, "write") || strings.Contains(content, "create") || strings.Contains(content, "generate") {
+			case strings.Contains(content, "write") || strings.Contains(content, "create") || strings.Contains(content, "generate"):
 				if !contains(topics, "content creation") {
 					topics = append(topics, "content creation")
 				}
@@ -147,9 +147,7 @@ func (cm *ContextManager) ShouldPrune(messages []Message) bool {
 func (cm *ContextManager) GetContextStats(messages []Message) ContextStats {
 	estimatedTokens := cm.EstimateTokens(messages)
 
-	userMsgs := 0
-	assistantMsgs := 0
-	systemMsgs := 0
+	var userMsgs, assistantMsgs, systemMsgs int
 
 	for _, msg := range messages {
 		switch msg.Role {

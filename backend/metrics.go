@@ -1,7 +1,7 @@
 package backend
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"log"
 	"os"
@@ -84,33 +84,41 @@ func NewMetricsLogger(sessionID string, conversationType string, budgetCfg Token
 	}, nil
 }
 
-// LogInteraction records a single API interaction
-func (ml *MetricsLogger) LogInteraction(usage *Usage, responseTime time.Duration, success bool, errorType string, promptType string) {
+// InteractionLog represents the details of a single interaction for logging
+type InteractionLog struct {
+	Usage        *Usage        `json:"usage,omitempty"`
+	ResponseTime time.Duration `json:"response_time"`
+	Success      bool          `json:"success"`
+	ErrorType    string        `json:"error_type,omitempty"`
+	PromptType   string        `json:"prompt_type"`
+}
+
+// LogInteraction records a single API interaction using a structured log
+func (ml *MetricsLogger) LogInteraction(log InteractionLog) {
 	interaction := InteractionMetric{
 		Timestamp:    time.Now(),
-		ResponseTime: responseTime.Milliseconds(),
-		Success:      success,
-		ErrorType:    errorType,
-		PromptType:   promptType,
+		ResponseTime: log.ResponseTime.Milliseconds(),
+		Success:      log.Success,
+		ErrorType:    log.ErrorType,
+		PromptType:   log.PromptType,
 	}
 
-	if usage != nil {
-		interaction.RequestTokens = usage.PromptTokens
-		interaction.ResponseTokens = usage.CompletionTokens
-		interaction.TotalTokens = usage.TotalTokens
+	if log.Usage != nil {
+		interaction.RequestTokens = log.Usage.PromptTokens
+		interaction.ResponseTokens = log.Usage.CompletionTokens
+		interaction.TotalTokens = log.Usage.TotalTokens
 
 		// Update session totals
-		ml.session.TotalTokens += usage.TotalTokens
-		ml.session.PromptTokens += usage.PromptTokens
-		ml.session.CompletionTokens += usage.CompletionTokens
-		ml.session.EstimatedCost += float64(usage.TotalTokens) * ml.budgetCfg.CostPerToken
+		ml.session.TotalTokens += log.Usage.TotalTokens
+		ml.session.PromptTokens += log.Usage.PromptTokens
+		ml.session.CompletionTokens += log.Usage.CompletionTokens
+		ml.session.EstimatedCost += float64(log.Usage.TotalTokens) * ml.budgetCfg.CostPerToken
 	}
 
 	ml.session.TotalRequests++
-	switch success {
-	case true:
+	if log.Success {
 		ml.session.SuccessfulReqs++
-	case false:
+	} else {
 		ml.session.FailedReqs++
 	}
 
@@ -121,6 +129,18 @@ func (ml *MetricsLogger) LogInteraction(usage *Usage, responseTime time.Duration
 		ml.logFile.WriteString(string(logLine) + "\n")
 		ml.logFile.Sync()
 	}
+}
+
+// LogInteractionLegacy provides backward compatibility for the old method signature
+// Deprecated: Use LogInteraction with InteractionLog struct instead
+func (ml *MetricsLogger) LogInteractionLegacy(usage *Usage, responseTime time.Duration, success bool, errorType string, promptType string) {
+	ml.LogInteraction(InteractionLog{
+		Usage:        usage,
+		ResponseTime: responseTime,
+		Success:      success,
+		ErrorType:    errorType,
+		PromptType:   promptType,
+	})
 }
 
 // CheckBudgetStatus returns warnings and recommendations based on current usage
@@ -178,6 +198,19 @@ func (ml *MetricsLogger) GetSessionSummary() SessionSummary {
 		AvgResponseTime:  avgResponseTime,
 		ConversationType: ml.session.ConversationType,
 	}
+}
+
+// GetPromptTypeBreakdown returns a breakdown of prompt types used in this session
+func (ml *MetricsLogger) GetPromptTypeBreakdown() map[string]int {
+	breakdown := make(map[string]int)
+
+	for _, interaction := range ml.session.Interactions {
+		if interaction.PromptType != "" {
+			breakdown[interaction.PromptType]++
+		}
+	}
+
+	return breakdown
 }
 
 // Close finalizes the session and closes log files

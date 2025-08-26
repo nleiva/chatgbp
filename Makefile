@@ -8,9 +8,9 @@ LDFLAGS=-ldflags="-s -w -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIM
 
 # Go related variables
 GOCMD=go
-GOBUILD=$(GOCMD) build
+GOBUILD=GOEXPERIMENT=jsonv2 $(GOCMD) build
 GOCLEAN=$(GOCMD) clean
-GOTEST=$(GOCMD) test
+GOTEST=GOEXPERIMENT=jsonv2 $(GOCMD) test
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
 GOFMT=$(GOCMD) fmt
@@ -57,7 +57,7 @@ fmt: ## Format Go code and templates
 	go tool templ fmt .
 
 vet: ## Run go vet
-	$(GOCMD) vet ./...
+	GOEXPERIMENT=jsonv2 $(GOCMD) vet ./...
 
 test: fmt vet ## Run tests with formatting and vetting
 	$(GOMOD) tidy

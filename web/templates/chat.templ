@@ -6,25 +6,25 @@ import "github.com/russross/blackfriday/v2"
 
 // markdownToHTML converts markdown text to HTML
 func markdownToHTML(markdown string) string {
-    extensions := blackfriday.CommonExtensions | blackfriday.AutoHeadingIDs | blackfriday.Footnotes
-    renderer := blackfriday.NewHTMLRenderer(blackfriday.HTMLRendererParameters{
-        Flags: blackfriday.CommonHTMLFlags | blackfriday.HrefTargetBlank,
-    })
-    
-    html := blackfriday.Run([]byte(markdown), blackfriday.WithRenderer(renderer), blackfriday.WithExtensions(extensions))
-    return string(html)
+	extensions := blackfriday.CommonExtensions | blackfriday.AutoHeadingIDs | blackfriday.Footnotes
+	renderer := blackfriday.NewHTMLRenderer(blackfriday.HTMLRendererParameters{
+		Flags: blackfriday.CommonHTMLFlags | blackfriday.HrefTargetBlank,
+	})
+
+	html := blackfriday.Run([]byte(markdown), blackfriday.WithRenderer(renderer), blackfriday.WithExtensions(extensions))
+	return string(html)
 }
 
 templ Layout(title string) {
 	<!DOCTYPE html>
 	<html lang="en">
-	<head>
-		<meta charset="UTF-8"/>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-		<title>{ title }</title>
-		<script src="https://unpkg.com/htmx.org@1.9.10"></script>
-		<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
-		<style>
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title }</title>
+			<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+			<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
+			<style>
 			* {
 				margin: 0;
 				padding: 0;
@@ -463,10 +463,10 @@ templ Layout(title string) {
 				color: #ffb3b3;
 			}
 		</style>
-	</head>
-	<body>
-		{ children... }
-	</body>
+		</head>
+		<body>
+			{ children... }
+		</body>
 	</html>
 }
 
@@ -487,7 +487,6 @@ templ ChatPage() {
 				<!-- Future: Add conversation history here -->
 			</div>
 		</div>
-		
 		<div class="main-content">
 			<div class="header">
 				<h1>ChatGBT</h1>
@@ -498,21 +497,19 @@ templ ChatPage() {
 					</button>
 				</div>
 			</div>
-			
 			<div id="chat-container" class="chat-container">
 				<div class="welcome-screen">
 					<h2>How can I help you today?</h2>
 					<p>I'm ChatGBT, your AI assistant. Ask me anything, and I'll do my best to help you with information, analysis, creative tasks, and more.</p>
 				</div>
 			</div>
-			
 			<div class="input-container">
 				<div class="input-wrapper">
 					<form class="input-form" hx-post="/chat" hx-target="#chat-container" hx-swap="beforeend" hx-on::after-request="this.reset();scrollToBottom();hideWelcomeScreen();">
-						<textarea 
-							name="message" 
-							class="input-field" 
-							placeholder="Message ChatGBT..." 
+						<textarea
+							name="message"
+							class="input-field"
+							placeholder="Message ChatGBT..."
 							required
 							rows="1"
 							onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();this.form.requestSubmit();}"
@@ -525,7 +522,6 @@ templ ChatPage() {
 				</div>
 			</div>
 		</div>
-		
 		<script>
 			function autoResize(textarea) {
 				textarea.style.height = 'auto';
@@ -571,7 +567,6 @@ templ ChatResponseComponent(userMessage, assistantMessage string, usage *backend
 		</div>
 		<div class="message-content">{ userMessage }</div>
 	</div>
-	
 	<!-- Assistant message -->
 	<div class="message assistant">
 		<div class="message-header">
@@ -584,7 +579,6 @@ templ ChatResponseComponent(userMessage, assistantMessage string, usage *backend
 			@templ.Raw(markdownToHTML(assistantMessage))
 		</div>
 	</div>
-	
 	<!-- Token stats if available -->
 	if usage != nil {
 		<div class="token-stats">
@@ -608,7 +602,6 @@ templ ChatResponseComponent(userMessage, assistantMessage string, usage *backend
 			</div>
 		</div>
 	}
-	
 	<!-- Warning message if available -->
 	if warningMsg != "" {
 		<div class="message warning">{ warningMsg }</div>

@@ -3,7 +3,6 @@ package web
 import (
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/a-h/templ"
@@ -11,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
+	"github.com/nleiva/chatgbt/app"
 	"github.com/nleiva/chatgbt/backend"
 	"github.com/nleiva/chatgbt/web/templates"
 )
@@ -19,56 +19,81 @@ const (
 	defaultSystemPrompt = "You are a helpful assistant."
 	defaultPort         = ":3000"
 	htmlContentType     = "text/html; charset=utf-8"
+	sessionCookieName   = "chatgbt_session_id"
+	sessionMaxAge       = 24 * time.Hour
 )
 
+// Server represents the web server with session management
 type Server struct {
 	app            *fiber.App
-	cfg            backend.LLMConfig
-	budgetCfg      backend.TokenBudgetConfig
-	messages       []backend.Message
-	metrics        *backend.MetricsLogger
-	contextManager *backend.ContextManager
-	sessionID      string
+	sessionManager app.SessionManager
 }
 
-type ChatSession struct {
-	Messages []backend.Message `json:"messages"`
-}
-
-// NewServer creates a new web server instance with budget tracking
+// NewServer creates a new web server instance with session management
 func NewServer(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) *Server {
-	app := fiber.New(fiber.Config{
+	fiberApp := fiber.New(fiber.Config{
 		DisableStartupMessage: false,
 	})
 
 	// Middleware
-	app.Use(logger.New())
-	app.Use(recover.New())
+	fiberApp.Use(logger.New())
+	fiberApp.Use(recover.New())
 
-	// Initialize session
-	sessionID := fmt.Sprintf("web_%d", time.Now().Unix())
-
-	// Initialize metrics logger
-	metrics, err := backend.NewMetricsLogger(sessionID, "web_session", budgetCfg)
-	if err != nil {
-		log.Printf("Warning: Could not initialize metrics logging: %v", err)
-	}
-
-	// Initialize context manager
-	contextManager := backend.NewContextManager(6000, 3, true) // 6k tokens, keep 3 recent exchanges, enable summaries
+	// Initialize session manager
+	sessionManager := app.NewInMemorySessionManager(cfg, budgetCfg, sessionMaxAge)
 
 	server := &Server{
-		app:            app,
-		cfg:            cfg,
-		budgetCfg:      budgetCfg,
-		messages:       []backend.Message{{Role: backend.RoleSystem, Content: defaultSystemPrompt}},
-		metrics:        metrics,
-		contextManager: contextManager,
-		sessionID:      sessionID,
+		app:            fiberApp,
+		sessionManager: sessionManager,
 	}
 
 	server.setupRoutes()
+
+	// Start cleanup routine for expired sessions
+	go server.startSessionCleanup()
+
 	return server
+}
+
+// startSessionCleanup runs a background cleanup routine for expired sessions
+func (s *Server) startSessionCleanup() {
+	ticker := time.NewTicker(30 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		cleaned := s.sessionManager.CleanupExpiredSessions()
+		if cleaned > 0 {
+			log.Printf("Cleaned up %d expired sessions", cleaned)
+		}
+	}
+}
+
+// getOrCreateSession gets an existing session or creates a new one for the user
+func (s *Server) getOrCreateSession(c *fiber.Ctx) (*app.ChatSession, error) {
+	sessionID := c.Cookies(sessionCookieName)
+
+	if sessionID != "" {
+		if session, err := s.sessionManager.GetSession(sessionID); err == nil {
+			return session, nil
+		}
+	}
+
+	// Create new session
+	session, err := s.sessionManager.CreateSession("web_user")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create session: %w", err)
+	}
+
+	// Set session cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     sessionCookieName,
+		Value:    session.ID,
+		MaxAge:   int(sessionMaxAge.Seconds()),
+		HTTPOnly: true,
+		SameSite: "Lax",
+	})
+
+	return session, nil
 }
 
 func (s *Server) setupRoutes() {
@@ -98,116 +123,52 @@ func (s *Server) renderComponent(c *fiber.Ctx, component templ.Component) error 
 	return component.Render(c.Context(), c.Response().BodyWriter())
 }
 
-// resetToSystemPrompt resets conversation with given system prompt
-func (s *Server) resetToSystemPrompt(prompt string) {
-	s.messages = []backend.Message{{Role: backend.RoleSystem, Content: prompt}}
-}
-
-// removeLastUserMessage removes the last user message from conversation history
-func (s *Server) removeLastUserMessage() {
-	if len(s.messages) > 0 && s.messages[len(s.messages)-1].Role == backend.RoleUser {
-		s.messages = s.messages[:len(s.messages)-1]
-	}
-}
-
 func (s *Server) handleFavicon(c *fiber.Ctx) error {
 	// Return a simple 204 No Content for favicon requests
-	// This prevents the 404 error without needing an actual favicon file
 	return c.SendStatus(204)
 }
 
 func (s *Server) handleChat(c *fiber.Ctx) error {
+	session, err := s.getOrCreateSession(c)
+	if err != nil {
+		return c.Status(500).SendString("Failed to get session: " + err.Error())
+	}
+
 	userMessage := c.FormValue("message")
 	if userMessage == "" {
 		return c.Status(400).SendString("Message is required")
 	}
 
-	// Check if we should prune before adding new input
-	if s.contextManager != nil && s.contextManager.ShouldPrune(s.messages) {
-		log.Println("Auto-pruning context due to token limit...")
-		newMessages, pruned := s.contextManager.PruneContext(s.messages, s.contextManager.EstimateTokens(s.messages))
-		if pruned {
-			s.messages = newMessages
-		}
-	}
-
-	// Add user message to conversation
-	s.messages = append(s.messages, backend.Message{
-		Role:    backend.RoleUser,
-		Content: userMessage,
-	})
-
-	// Determine prompt type for metrics
-	promptType := "general"
-	lowerInput := strings.ToLower(userMessage)
-	switch {
-	case strings.Contains(lowerInput, "code") || strings.Contains(lowerInput, "debug"):
-		promptType = "code_help"
-	case strings.Contains(lowerInput, "explain") || strings.Contains(lowerInput, "how"):
-		promptType = "explanation"
-	case strings.Contains(lowerInput, "write") || strings.Contains(lowerInput, "create"):
-		promptType = "creative"
-	}
-
-	// Get AI response with timing
-	startTime := time.Now()
-	var reply string
-	var usage *backend.Usage
-	var err error
-
-	switch s.cfg.ShowUsage {
-	case true:
-		reply, usage, err = backend.ChatWithLLMWithUsage(s.cfg, s.messages)
-	default:
-		reply, err = backend.ChatWithLLM(s.cfg, s.messages)
-	}
-
-	responseTime := time.Since(startTime)
-
-	// Log the interaction
-	if s.metrics != nil {
-		errorType := ""
-		if err != nil {
-			errorType = "api_error"
-		}
-		s.metrics.LogInteraction(usage, responseTime, err == nil, errorType, promptType)
-	}
-
+	// Process the user message using the session
+	response, err := session.ProcessUserMessage(userMessage)
 	if err != nil {
-		// Remove user message from history on error
-		s.removeLastUserMessage()
-
 		// Show error message
 		return s.renderComponent(c, templates.MessageComponent(string(backend.RoleAssistant), "Error: "+err.Error()))
 	}
 
-	// Add assistant message to conversation
-	s.messages = append(s.messages, backend.Message{
-		Role:    backend.RoleAssistant,
-		Content: reply,
-	})
-
 	// Prepare warning message if any
 	var warningMsg string
-	if s.metrics != nil {
-		status := s.metrics.CheckBudgetStatus()
-		if len(status.Warnings) > 0 {
-			warningMsg = fmt.Sprintf("⚠️ %s", status.Warnings[0])
-		}
+	if len(response.Warnings) > 0 {
+		warningMsg = fmt.Sprintf(" %s", response.Warnings[0])
 	}
 
 	// Render everything as a single response
 	return s.renderComponent(c, templates.ChatResponseComponent(
 		userMessage,
-		reply,
-		usage,
-		responseTime.Milliseconds(),
+		response.Content,
+		response.Usage,
+		response.ResponseTime.Milliseconds(),
 		warningMsg,
 	))
 }
 
 func (s *Server) handleReset(c *fiber.Ctx) error {
-	s.resetToSystemPrompt(defaultSystemPrompt)
+	session, err := s.getOrCreateSession(c)
+	if err != nil {
+		return c.Status(500).SendString("Failed to get session: " + err.Error())
+	}
+
+	session.Reset(defaultSystemPrompt)
 
 	// Return the welcome screen HTML
 	return c.SendString(`<div class="welcome-screen">
@@ -217,12 +178,17 @@ func (s *Server) handleReset(c *fiber.Ctx) error {
 }
 
 func (s *Server) handleSystemPrompt(c *fiber.Ctx) error {
+	session, err := s.getOrCreateSession(c)
+	if err != nil {
+		return c.Status(500).SendString("Failed to get session: " + err.Error())
+	}
+
 	newPrompt := c.FormValue("prompt")
 	if newPrompt == "" {
 		return c.Status(400).SendString("System prompt is required")
 	}
 
-	s.resetToSystemPrompt(newPrompt)
+	session.UpdateSystemPrompt(newPrompt)
 
 	return c.SendString(`<div class="message system">
 		<div class="message-role">system</div>
@@ -232,46 +198,42 @@ func (s *Server) handleSystemPrompt(c *fiber.Ctx) error {
 
 // handleStatus returns budget and session status as JSON
 func (s *Server) handleStatus(c *fiber.Ctx) error {
-	if s.metrics == nil {
+	session, err := s.getOrCreateSession(c)
+	if err != nil {
 		return c.JSON(fiber.Map{
-			"error": "Metrics not available",
+			"error": "Failed to get session: " + err.Error(),
 		})
 	}
 
-	status := s.metrics.CheckBudgetStatus()
-	summary := s.metrics.GetSessionSummary()
-
-	var contextStats map[string]interface{}
-	if s.contextManager != nil {
-		stats := s.contextManager.GetContextStats(s.messages)
-		contextStats = map[string]interface{}{
-			"total_messages":     stats.TotalMessages,
-			"user_messages":      stats.UserMessages,
-			"assistant_messages": stats.AssistantMessages,
-			"system_messages":    stats.SystemMessages,
-			"estimated_tokens":   stats.EstimatedTokens,
-			"token_limit":        stats.TokenLimit,
-			"utilization_pct":    stats.UtilizationPct,
-			"should_prune":       stats.ShouldPrune,
-		}
-	}
+	budgetStatus := session.GetBudgetStatus()
+	sessionSummary := session.GetSessionSummary()
+	contextStats := session.GetContextStats()
 
 	return c.JSON(fiber.Map{
 		"budget": fiber.Map{
-			"session_tokens": status.SessionTokens,
-			"session_limit":  status.SessionLimit,
-			"session_cost":   status.SessionCost,
-			"warnings":       status.Warnings,
-			"should_prune":   status.ShouldPrune,
+			"session_tokens": budgetStatus.SessionTokens,
+			"session_limit":  budgetStatus.SessionLimit,
+			"session_cost":   budgetStatus.SessionCost,
+			"warnings":       budgetStatus.Warnings,
+			"should_prune":   budgetStatus.ShouldPrune,
 		},
 		"session": fiber.Map{
-			"total_requests":    summary.TotalRequests,
-			"success_rate":      summary.SuccessRate,
-			"estimated_cost":    summary.EstimatedCost,
-			"duration_seconds":  summary.Duration.Seconds(),
-			"avg_response_time": summary.AvgResponseTime,
+			"total_requests":    sessionSummary.TotalRequests,
+			"success_rate":      sessionSummary.SuccessRate,
+			"estimated_cost":    sessionSummary.EstimatedCost,
+			"duration_seconds":  sessionSummary.Duration.Seconds(),
+			"avg_response_time": sessionSummary.AvgResponseTime,
 		},
-		"context": contextStats,
+		"context": fiber.Map{
+			"total_messages":     contextStats.TotalMessages,
+			"user_messages":      contextStats.UserMessages,
+			"assistant_messages": contextStats.AssistantMessages,
+			"system_messages":    contextStats.SystemMessages,
+			"estimated_tokens":   contextStats.EstimatedTokens,
+			"token_limit":        contextStats.TokenLimit,
+			"utilization_pct":    contextStats.UtilizationPct,
+			"should_prune":       contextStats.ShouldPrune,
+		},
 	})
 }
 
@@ -281,18 +243,8 @@ func (s *Server) Run(port string) error {
 		port = defaultPort
 	}
 
-	// Setup graceful shutdown
-	if s.metrics != nil {
-		defer func() {
-			summary := s.metrics.GetSessionSummary()
-			log.Printf("Session Summary: %d requests, %.1f%% success, $%.4f cost, %v duration",
-				summary.TotalRequests, summary.SuccessRate*100, summary.EstimatedCost, summary.Duration)
-			s.metrics.Close()
-		}()
-	}
-
 	log.Printf("Starting web server on http://localhost%s", port)
-	log.Printf("Budget: %d tokens, cost limit: $%.4f", s.budgetCfg.SessionLimit,
-		float64(s.budgetCfg.SessionLimit)*s.budgetCfg.CostPerToken)
+	log.Printf("Session management: enabled with %v max age", sessionMaxAge)
+
 	return s.app.Listen(port)
 }

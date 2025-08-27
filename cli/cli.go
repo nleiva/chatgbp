@@ -261,8 +261,17 @@ func (h *CLIHandler) Close() error {
 	return nil
 }
 
-// Run is the main entry point for CLI mode
-func Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
+
+// CLIRunner handles interactive CLI mode
+type CLIRunner struct{}
+
+// NewCLIRunner creates a new CLI runner
+func NewCLIRunner() *CLIRunner {
+	return &CLIRunner{}
+}
+
+// Run is the main entry point for CLI modeArg
+func (c *CLIRunner) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
 	handler, err := NewCLIHandler(cfg, budgetCfg)
 	if err != nil {
 		return fmt.Errorf("failed to create CLI handler: %w", err)
@@ -275,19 +284,6 @@ func Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
 	}()
 
 	return handler.Run()
-}
-
-// CLIRunner handles interactive CLI mode
-type CLIRunner struct{}
-
-// NewCLIRunner creates a new CLI runner
-func NewCLIRunner() *CLIRunner {
-	return &CLIRunner{}
-}
-
-// Run executes the interactive CLI with the provided configuration
-func (c *CLIRunner) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
-	return Run(cfg, budgetCfg)
 }
 
 // DirectQueryRunner handles single-query mode for quick interactions

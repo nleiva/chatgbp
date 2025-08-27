@@ -17,7 +17,7 @@ import (
 
 const (
 	defaultSystemPrompt = "You are a helpful assistant."
-	defaultPort         = ":3000"
+	defaultAddress         = ":3000"
 	htmlContentType     = "text/html; charset=utf-8"
 	sessionCookieName   = "chatgbt_session_id"
 	sessionMaxAge       = 24 * time.Hour
@@ -254,13 +254,13 @@ func (s *Server) handleStatus(c *fiber.Ctx) error {
 }
 
 // Run starts the web server with graceful shutdown
-func (s *Server) Run(port string) error {
-	if port == "" {
-		port = defaultPort
+func (s *Server) Run(address string) error {
+	if address == "" {
+		address = defaultAddress
 	}
 
-	log.Printf("Starting web server on http://localhost%s", port)
+	log.Printf("Starting web server on http://localhost%s", address)
 	log.Printf("Session management: enabled with %v max age", sessionMaxAge)
 
-	return s.app.Listen(port)
+	return s.app.Listen(address)
 }

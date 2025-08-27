@@ -31,16 +31,16 @@ func (c *CLI) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) er
 
 // Web wraps the web server functionality
 type Web struct {
-	port string
+	address string
 }
 
 func NewWeb(cfg *config.Config) *Web {
 	address := net.JoinHostPort("", strconv.Itoa(cfg.Port))
-	return &Web{port: address}
+	return &Web{address: address}
 }
 
 func (w *Web) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
-	webRunner := web.NewWebRunner(w.port)
+	webRunner := web.NewWebRunner(w.address)
 	return webRunner.Run(cfg, budgetCfg)
 }
 

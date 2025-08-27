@@ -1,18 +1,63 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/nleiva/chatgbt/app"
 	"github.com/nleiva/chatgbt/cli"
 	"github.com/nleiva/chatgbt/config"
 	"github.com/nleiva/chatgbt/web"
 )
+
+// Mode represents a runnable application mode
+type Mode interface {
+	Run() error
+}
+
+// CLI wraps the CLI functionality
+type CLI struct {
+	cfg *config.Config
+}
+
+func NewCLI(cfg *config.Config) *CLI {
+	return &CLI{cfg: cfg}
+}
+
+func (c *CLI) Run() error {
+	return cli.Run(c.cfg.LLM, c.cfg.Budget)
+}
+
+// Web wraps the web server functionality
+type Web struct {
+	cfg *config.Config
+}
+
+func NewWeb(cfg *config.Config) *Web {
+	return &Web{cfg: cfg}
+}
+
+func (w *Web) Run() error {
+	address := net.JoinHostPort("", strconv.Itoa(w.cfg.Port))
+	server := web.NewServer(w.cfg.LLM, w.cfg.Budget)
+	return server.Run(address)
+}
+
+// DirectQuery wraps the direct query functionality
+type DirectQuery struct {
+	query string
+	cfg   *config.Config
+}
+
+func NewDirectQuery(query string, cfg *config.Config) *DirectQuery {
+	return &DirectQuery{query: query, cfg: cfg}
+}
+
+func (d *DirectQuery) Run() error {
+	return cli.RunDirect(d.query, d.cfg.LLM, d.cfg.Budget, d.cfg.LLM.ShowUsage)
+}
 
 // printUsage displays the usage information
 func printUsage() {
@@ -29,32 +74,13 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  COST_BUDGET     Optional: Session cost budget in USD (default: $0.02)\n")
 }
 
-// runDirectQuery handles single-query mode for quick interactions
-func runDirectQuery(query string, cfg *config.Config) error {
-	// Create LLM client
-	client := app.NewLLMClient(cfg.LLM)
-
-	// Create metrics logger
-	logger, err := app.NewMetricsLogger("direct_query", "quick", cfg.Budget)
-	if err != nil {
-		return fmt.Errorf("failed to create metrics logger: %w", err)
-	}
-	defer logger.Close()
-
-	// Create and execute the service
-	service := app.NewDirectQueryService(client, logger, os.Stdout)
-	ctx := context.Background()
-
-	return service.Execute(ctx, query, cfg.LLM.ShowUsage)
-}
-
 func run(args []string) error {
 	if len(args) < 2 {
 		printUsage()
 		return fmt.Errorf("mode argument required")
 	}
 
-	mode := args[1]
+	modeArg := args[1]
 
 	// Load configuration from environment
 	cfg, err := config.LoadFromEnv(os.Stderr)
@@ -62,24 +88,24 @@ func run(args []string) error {
 		return err
 	}
 
-	switch mode {
+	var mode Mode
+
+	switch modeArg {
 	case "cli":
-		// Start CLI mode
-		return cli.Run(cfg.LLM, cfg.Budget)
+		mode = NewCLI(cfg)
 	case "web":
-		// Configure web server
-		address := net.JoinHostPort("", strconv.Itoa(cfg.Port))
-		server := web.NewServer(cfg.LLM, cfg.Budget)
-		return server.Run(address)
+		mode = NewWeb(cfg)
 	default:
 		// Handle direct query mode
-		query := mode
+		query := modeArg
 		if len(args) > 2 {
 			// Join all remaining args as the query
 			query = strings.Join(args[1:], " ")
 		}
-		return runDirectQuery(query, cfg)
+		mode = NewDirectQuery(query, cfg)
 	}
+
+	return mode.Run()
 }
 
 func main() {

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -274,4 +275,23 @@ func Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
 	}()
 
 	return handler.Run()
+}
+
+// RunDirect handles single-query mode for quick interactions
+func RunDirect(query string, cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig, showUsage bool) error {
+	// Create LLM client
+	client := app.NewLLMClient(cfg)
+
+	// Create metrics logger
+	logger, err := app.NewMetricsLogger("direct_query", "quick", budgetCfg)
+	if err != nil {
+		return fmt.Errorf("failed to create metrics logger: %w", err)
+	}
+	defer logger.Close()
+
+	// Create and execute the service
+	service := app.NewDirectQueryService(client, logger, os.Stdout)
+	ctx := context.Background()
+
+	return service.Execute(ctx, query, showUsage)
 }

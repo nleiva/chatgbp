@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/nleiva/chatgbt/backend"
 	"github.com/nleiva/chatgbt/cli"
 	"github.com/nleiva/chatgbt/config"
 	"github.com/nleiva/chatgbt/web"
@@ -14,49 +15,51 @@ import (
 
 // Mode represents a runnable application mode
 type Mode interface {
-	Run() error
+	Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error
 }
 
 // CLI wraps the CLI functionality
-type CLI struct {
-	cfg *config.Config
-}
+type CLI struct{}
 
 func NewCLI(cfg *config.Config) *CLI {
-	return &CLI{cfg: cfg}
+	return &CLI{}
 }
 
-func (c *CLI) Run() error {
-	return cli.Run(c.cfg.LLM, c.cfg.Budget)
+func (c *CLI) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
+	return cli.Run(cfg, budgetCfg)
 }
 
 // Web wraps the web server functionality
 type Web struct {
-	cfg *config.Config
+	port string
 }
 
 func NewWeb(cfg *config.Config) *Web {
-	return &Web{cfg: cfg}
+	address := net.JoinHostPort("", strconv.Itoa(cfg.Port))
+	return &Web{port: address}
 }
 
-func (w *Web) Run() error {
-	address := net.JoinHostPort("", strconv.Itoa(w.cfg.Port))
-	server := web.NewServer(w.cfg.LLM, w.cfg.Budget)
-	return server.Run(address)
+func (w *Web) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
+	webRunner := web.NewWebRunner(w.port)
+	return webRunner.Run(cfg, budgetCfg)
 }
 
 // DirectQuery wraps the direct query functionality
 type DirectQuery struct {
-	query string
-	cfg   *config.Config
+	query     string
+	showUsage bool
 }
 
 func NewDirectQuery(query string, cfg *config.Config) *DirectQuery {
-	return &DirectQuery{query: query, cfg: cfg}
+	return &DirectQuery{
+		query:     query,
+		showUsage: cfg.LLM.ShowUsage,
+	}
 }
 
-func (d *DirectQuery) Run() error {
-	return cli.RunDirect(d.query, d.cfg.LLM, d.cfg.Budget, d.cfg.LLM.ShowUsage)
+func (d *DirectQuery) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
+	queryRunner := cli.NewDirectQueryRunner(d.query, d.showUsage)
+	return queryRunner.Run(cfg, budgetCfg)
 }
 
 // printUsage displays the usage information
@@ -105,7 +108,7 @@ func run(args []string) error {
 		mode = NewDirectQuery(query, cfg)
 	}
 
-	return mode.Run()
+	return mode.Run(cfg.LLM, cfg.Budget)
 }
 
 func main() {

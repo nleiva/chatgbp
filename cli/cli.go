@@ -277,8 +277,22 @@ func Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
 	return handler.Run()
 }
 
-// RunDirect handles single-query mode for quick interactions
-func RunDirect(query string, cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig, showUsage bool) error {
+// DirectQueryRunner handles single-query mode for quick interactions
+type DirectQueryRunner struct {
+	query     string
+	showUsage bool
+}
+
+// NewDirectQueryRunner creates a new direct query runner
+func NewDirectQueryRunner(query string, showUsage bool) *DirectQueryRunner {
+	return &DirectQueryRunner{
+		query:     query,
+		showUsage: showUsage,
+	}
+}
+
+// Run executes the direct query with the provided configuration
+func (d *DirectQueryRunner) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
 	// Create LLM client
 	client := app.NewLLMClient(cfg)
 
@@ -293,5 +307,11 @@ func RunDirect(query string, cfg backend.LLMConfig, budgetCfg backend.TokenBudge
 	service := app.NewDirectQueryService(client, logger, os.Stdout)
 	ctx := context.Background()
 
-	return service.Execute(ctx, query, showUsage)
+	return service.Execute(ctx, d.query, d.showUsage)
+}
+
+// RunDirect handles single-query mode for quick interactions (legacy function)
+func RunDirect(query string, cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig, showUsage bool) error {
+	runner := NewDirectQueryRunner(query, showUsage)
+	return runner.Run(cfg, budgetCfg)
 }

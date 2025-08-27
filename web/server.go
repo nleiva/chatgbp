@@ -29,6 +29,22 @@ type Server struct {
 	sessionManager app.SessionManager
 }
 
+// WebRunner handles web server mode with consistent signature
+type WebRunner struct {
+	port string
+}
+
+// NewWebRunner creates a new web runner for the specified port
+func NewWebRunner(port string) *WebRunner {
+	return &WebRunner{port: port}
+}
+
+// Run starts the web server with the provided configuration
+func (w *WebRunner) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
+	server := NewServer(cfg, budgetCfg)
+	return server.Run(w.port)
+}
+
 // NewServer creates a new web server instance with session management
 func NewServer(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) *Server {
 	fiberApp := fiber.New(fiber.Config{
@@ -149,7 +165,7 @@ func (s *Server) handleChat(c *fiber.Ctx) error {
 	// Prepare warning message if any
 	var warningMsg string
 	if len(response.Warnings) > 0 {
-		warningMsg = fmt.Sprintf(" %s", response.Warnings[0])
+		warningMsg = fmt.Sprintf("⚠️ %s", response.Warnings[0])
 	}
 
 	// Render everything as a single response

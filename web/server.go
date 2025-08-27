@@ -31,18 +31,18 @@ type Server struct {
 
 // WebRunner handles web server mode with consistent signature
 type WebRunner struct {
-	port string
+	address string
 }
 
-// NewWebRunner creates a new web runner for the specified port
-func NewWebRunner(port string) *WebRunner {
-	return &WebRunner{port: port}
+// NewWebRunner creates a new web runner for the specified address
+func NewWebRunner(address string) *WebRunner {
+	return &WebRunner{address: address}
 }
 
 // Run starts the web server with the provided configuration
 func (w *WebRunner) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
 	server := NewServer(cfg, budgetCfg)
-	return server.Run(w.port)
+	return server.Run(w.address)
 }
 
 // NewServer creates a new web server instance with session management

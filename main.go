@@ -18,50 +18,6 @@ type Mode interface {
 	Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error
 }
 
-// CLI wraps the CLI functionality
-type CLI struct{}
-
-func NewCLI(cfg *config.Config) *CLI {
-	return &CLI{}
-}
-
-func (c *CLI) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
-	return cli.Run(cfg, budgetCfg)
-}
-
-// Web wraps the web server functionality
-type Web struct {
-	address string
-}
-
-func NewWeb(cfg *config.Config) *Web {
-	address := net.JoinHostPort("", strconv.Itoa(cfg.Port))
-	return &Web{address: address}
-}
-
-func (w *Web) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
-	webRunner := web.NewWebRunner(w.address)
-	return webRunner.Run(cfg, budgetCfg)
-}
-
-// DirectQuery wraps the direct query functionality
-type DirectQuery struct {
-	query     string
-	showUsage bool
-}
-
-func NewDirectQuery(query string, cfg *config.Config) *DirectQuery {
-	return &DirectQuery{
-		query:     query,
-		showUsage: cfg.LLM.ShowUsage,
-	}
-}
-
-func (d *DirectQuery) Run(cfg backend.LLMConfig, budgetCfg backend.TokenBudgetConfig) error {
-	queryRunner := cli.NewDirectQueryRunner(d.query, d.showUsage)
-	return queryRunner.Run(cfg, budgetCfg)
-}
-
 // printUsage displays the usage information
 func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage: %s <mode> [options]\n", os.Args[0])
@@ -95,9 +51,10 @@ func run(args []string) error {
 
 	switch modeArg {
 	case "cli":
-		mode = NewCLI(cfg)
+		mode = cli.NewCLIRunner()
 	case "web":
-		mode = NewWeb(cfg)
+		address := net.JoinHostPort("", strconv.Itoa(cfg.Port))
+		mode = web.NewWebRunner(address)
 	default:
 		// Handle direct query mode
 		query := modeArg
@@ -105,7 +62,7 @@ func run(args []string) error {
 			// Join all remaining args as the query
 			query = strings.Join(args[1:], " ")
 		}
-		mode = NewDirectQuery(query, cfg)
+		mode = cli.NewDirectQueryRunner(query, cfg.LLM.ShowUsage)
 	}
 
 	return mode.Run(cfg.LLM, cfg.Budget)

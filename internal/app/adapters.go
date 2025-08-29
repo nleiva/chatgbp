@@ -4,14 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nleiva/chatgbt/backend"
-	"github.com/nleiva/chatgbt/llm"
+	"github.com/nleiva/chatgbt/pkg/backend"
 )
-
-// NewLLMClient creates a new LLM client with default timeout
-func NewLLMClient(config backend.LLMConfig) LLMClient {
-	return llm.NewClientWithDefaults(config)
-}
 
 // MetricsLoggerAdapter adapts backend.MetricsLogger to implement the app.Logger interface
 type MetricsLoggerAdapter struct {

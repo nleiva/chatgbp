@@ -6,14 +6,13 @@ import (
 	"io"
 	"time"
 
-	"github.com/nleiva/chatgbt/backend"
+	"github.com/nleiva/chatgbt/pkg/backend"
 )
 
 // LLMClient defines the interface for Large Language Model interactions.
 // It provides both simple chat and chat-with-usage methods for different use cases.
 type LLMClient interface {
-	Chat(ctx context.Context, messages []backend.Message) (string, error)
-	ChatWithUsage(ctx context.Context, messages []backend.Message) (string, *backend.Usage, error)
+	CreateCompletion(ctx context.Context, req *backend.ChatCompletionRequest) (*backend.ChatCompletionResponse, error)
 }
 
 // InteractionLogger handles logging of individual interactions
@@ -73,8 +72,20 @@ func (s *DirectQueryService) Execute(ctx context.Context, query string, showUsag
 	}
 
 	start := time.Now()
-	response, usage, err := s.client.ChatWithUsage(ctx, messages)
+	// Create completion request
+	req := &backend.ChatCompletionRequest{
+		Messages: messages,
+	}
+
+	resp, err := s.client.CreateCompletion(ctx, req)
 	responseTime := time.Since(start)
+
+	var response string
+	var usage *backend.Usage
+	if err == nil && len(resp.Choices) > 0 {
+		response = resp.Choices[0].Message.Content
+		usage = resp.Usage
+	}
 
 	if err != nil {
 		s.logger.LogInteraction(backend.InteractionLog{

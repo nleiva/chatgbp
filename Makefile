@@ -32,17 +32,17 @@ help: ## Show this help message
 
 # Build targets
 build: generate ## Build the application (with template generation)
-	$(GOBUILD) -o $(EXECUTABLE) .
+	$(GOBUILD) -o $(EXECUTABLE) ./pkg/cmd
 
 build-cli: ## Build for CLI mode only (no template generation)
-	$(GOBUILD) -o $(EXECUTABLE) .
+	$(GOBUILD) -o $(EXECUTABLE) ./pkg/cmd
 
 build-web: generate ## Build for web mode (with template generation)
-	$(GOBUILD) -o $(EXECUTABLE) .
+	$(GOBUILD) -o $(EXECUTABLE) ./pkg/cmd
 
 build-prod: generate ## Build for production with optimizations
 	mkdir -p $(BINARY_DIR)
-	$(GOBUILD) $(LDFLAGS) -o $(BINARY_DIR)/$(EXECUTABLE) .
+	$(GOBUILD) $(LDFLAGS) -o $(BINARY_DIR)/$(EXECUTABLE) ./pkg/cmd
 
 # Development targets
 run-cli: build-cli ## Run in CLI mode

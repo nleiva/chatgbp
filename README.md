@@ -6,7 +6,7 @@ A simple ChatGPT clone built for educational purposes, supporting CLI, web, and 
 ## Prerequisites
 
 - Go 1.25 or later (json/v2)
-- OpenAI API key
+- LLM Provider API key
 
 ## Installation
 
@@ -25,7 +25,7 @@ make build
 
 ### Environment Variables
 
-- `OPENAI_API_KEY` (required): Your OpenAI API key
+- `API_KEY` (required): Your LLM Provider API key
 - `MODEL` (optional): Model to use (default: gpt-3.5-turbo)
 - `PORT` (optional): Port for web server (default: 3000)
 - `TOKEN_BUDGET` (optional): Session token budget (default: 10000)
@@ -35,8 +35,15 @@ make build
 
 Interactive terminal interface:
 
+## Quick Start
+
 ```bash
-export OPENAI_API_KEY="your-api-key-here"
+# Set your API key
+export API_KEY="your-key-here"
+
+# Optional: Set LLM provider (defaults to openai)
+export LLM_PROVIDER="openai"  # or "anthropic", "bedrock"
+
 make run-cli
 ```
 

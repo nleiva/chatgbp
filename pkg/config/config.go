@@ -6,14 +6,15 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/nleiva/chatgbt/backend"
+	"github.com/nleiva/chatgbt/pkg/backend"
 )
 
 const (
 	// Default configuration values
-	DefaultModel = "gpt-3.5-turbo"
-	DefaultURL   = "https://api.openai.com/v1/chat/completions"
-	DefaultPort  = 3000
+	DefaultModel    = "gpt-3.5-turbo"
+	DefaultURL      = "https://api.openai.com/v1/chat/completions"
+	DefaultPort     = 3000
+	DefaultProvider = "openai"
 )
 
 // Config holds all application configuration for the chatgbt application.
@@ -28,7 +29,7 @@ type Config struct {
 // Validate checks the configuration for correctness
 func (c *Config) Validate() error {
 	if c.LLM.APIKey == "" {
-		return fmt.Errorf("OPENAI_API_KEY is required")
+		return fmt.Errorf("API_KEY is required")
 	}
 	if c.LLM.URL == "" {
 		return fmt.Errorf("API URL cannot be empty")
@@ -73,9 +74,9 @@ func LoadFromEnv(w io.Writer) (*Config, error) {
 
 // loadLLMConfig creates LLM configuration from environment variables
 func loadLLMConfig() (backend.LLMConfig, error) {
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	apiKey := os.Getenv("API_KEY")
 	if apiKey == "" {
-		return backend.LLMConfig{}, fmt.Errorf("missing API key: please set the OPENAI_API_KEY environment variable")
+		return backend.LLMConfig{}, fmt.Errorf("missing API key: please set the API_KEY environment variable")
 	}
 
 	model := os.Getenv("MODEL")
@@ -83,10 +84,17 @@ func loadLLMConfig() (backend.LLMConfig, error) {
 		model = DefaultModel
 	}
 
+	// For now, we're defaulting to OpenAI, but this can be extended later
+	provider := os.Getenv("LLM_PROVIDER")
+	if provider == "" {
+		provider = DefaultProvider
+	}
+
 	return backend.LLMConfig{
 		APIKey:    apiKey,
 		URL:       DefaultURL,
 		Model:     model,
+		Provider:  backend.ProviderName(provider),
 		ShowUsage: true,
 	}, nil
 }

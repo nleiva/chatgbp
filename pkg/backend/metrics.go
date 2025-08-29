@@ -1,7 +1,7 @@
 package backend
 
 import (
-	"encoding/json/v2"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"

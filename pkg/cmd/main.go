@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nleiva/chatgbt/backend"
-	"github.com/nleiva/chatgbt/cli"
-	"github.com/nleiva/chatgbt/config"
-	"github.com/nleiva/chatgbt/web"
+	"github.com/nleiva/chatgbt/internal/cli"
+	"github.com/nleiva/chatgbt/internal/web"
+	"github.com/nleiva/chatgbt/pkg/backend"
+	"github.com/nleiva/chatgbt/pkg/config"
 )
 
 // Mode represents a runnable application mode
@@ -26,7 +26,8 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  web           Start in web mode (HTTP server)\n")
 	fmt.Fprintf(os.Stderr, "  \"<query>\"     Quick query mode (non-interactive)\n")
 	fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
-	fmt.Fprintf(os.Stderr, "  OPENAI_API_KEY   Required: Your OpenAI API key\n")
+	fmt.Fprintf(os.Stderr, "  API_KEY         Required: Your API key for the selected provider\n")
+	fmt.Fprintf(os.Stderr, "  LLM_PROVIDER    Optional: LLM provider (openai, anthropic, bedrock) (default: openai)\n")
 	fmt.Fprintf(os.Stderr, "  MODEL           Optional: Model to use (default: %s)\n", config.DefaultModel)
 	fmt.Fprintf(os.Stderr, "  PORT            Optional: Web server port number (default: %d)\n", config.DefaultPort)
 	fmt.Fprintf(os.Stderr, "  TOKEN_BUDGET    Optional: Session token budget (default: 10000)\n")

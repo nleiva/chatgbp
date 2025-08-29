@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nleiva/chatgbt/backend"
+	"github.com/nleiva/chatgbt/pkg/backend"
 )
 
 // SessionManager handles creation and lifecycle of chat sessions

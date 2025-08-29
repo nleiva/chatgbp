@@ -5,7 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nleiva/chatgbt/backend"
+	"github.com/nleiva/chatgbt/pkg/backend"
+	"github.com/nleiva/chatgbt/pkg/llm"
 )
 
 // ChatSession represents a conversation session with shared logic for CLI and Web modes
@@ -36,7 +37,10 @@ type SessionConfig struct {
 // NewChatSession creates a new chat session with all dependencies initialized
 func NewChatSession(config SessionConfig) (*ChatSession, error) {
 	// Initialize LLM client
-	llmClient := NewLLMClient(config.LLMConfig)
+	llmClient, err := llm.NewClient(config.LLMConfig, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
 
 	// Initialize metrics logger
 	logger, err := NewMetricsLogger(config.ID, config.ConversationType, config.BudgetConfig)
@@ -92,8 +96,20 @@ func (s *ChatSession) ProcessUserMessage(userMessage string) (*ChatResponse, err
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	reply, usage, err := s.LLMClient.ChatWithUsage(ctx, s.Messages)
+	// Create completion request
+	req := &backend.ChatCompletionRequest{
+		Messages: s.Messages,
+	}
+
+	resp, err := s.LLMClient.CreateCompletion(ctx, req)
 	responseTime := time.Since(startTime)
+
+	var reply string
+	var usage *backend.Usage
+	if err == nil && len(resp.Choices) > 0 {
+		reply = resp.Choices[0].Message.Content
+		usage = resp.Usage
+	}
 
 	// Log the interaction
 	s.Logger.LogInteraction(backend.InteractionLog{
